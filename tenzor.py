@@ -9,43 +9,33 @@ class PersonDbTemplates:
         self.delete_list = []
         self.update_list = []
 
+    def in_list(self, check_list, id):
+        for elem in check_list:  # проверка на нахождение в списке для добавления эл-та
+            if id == elem[-1]:
+                return False
+        return True
+
+    def remove_in_list(self, check_list, id, pozition):
+        for elem in check_list:  # удаление из update, если он там
+            if id == elem[pozition]:
+                return elem
+
     def add(self, id=None, name=None, birthdate=None):  # возможность добавлять id снаружи
         if id is None:
             id = str(uuid.uuid4())  # uuid храню в строке, sqlite нет такого типа данных
-        flag_in_list = 0
-        for elem in self.delete_list:  # проверка на нахождение в списке удаления
-            if id == elem[0]:
-                flag_in_list = 1
-                break
-        if not flag_in_list:
+        if self.in_list(self.delete_list, id):
             a = (id, name, birthdate)  # добавление
             self.insert_list.append(tuple(a))
-            for elem in self.update_list:  # удаление из update, если он там
-                if id == elem[-1]:
-                    self.update_list.remove(elem)
+            self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
 
     def update(self, id, name=None, birthdate=None):
-        flag_in_list = 0
-        for elem in self.delete_list:  # проверка на нахождение в удалении
-            if id == elem[0]:
-                flag_in_list = 1
-                break
-        for elem in self.insert_list:  # проверка на нахождение в добавлении
-            if id == elem[0]:
-                flag_in_list = 1
-                break
-        if not flag_in_list:
-            a = [name, id, birthdate, id, id]  # добавление
-            self.update_list.append(tuple(a))
+        if self.in_list(self.delete_list, id) and self.in_list(self.insert_list, id):
+            self.update_list.append(tuple([name, id, birthdate, id, id]))
 
     def delete(self, id):  # удаление по uuid
         self.delete_list.append((id,))
-        for elem in self.insert_list:  # убираем из add если он там
-            if id == elem[0]:
-                self.insert_list.remove(elem)
-        for elem in self.update_list:  # убираем из update усли он там
-            if id == elem[-1]:
-                self.update_list.remove(elem)
+        self.insert_list.remove(self.remove_in_list(self.insert_list, id, 0))
+        self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
 
     def get_sql_statements(self):
         try:
