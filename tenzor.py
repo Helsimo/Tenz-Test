@@ -16,17 +16,19 @@ class PersonDbTemplates:
         return True
 
     def remove_in_list(self, check_list, id, pozition):
-        for elem in check_list:  # удаление из update, если он там
+        for elem in check_list:  # нахождение элемента, для удаления
             if id == elem[pozition]:
                 return elem
+        return False
 
     def add(self, id=None, name=None, birthdate=None):  # возможность добавлять id снаружи
         if id is None:
-            id = str(uuid.uuid4())  # uuid храню в строке, sqlite нет такого типа данных
+            id = str(uuid.uuid4())  # uuid храню в строке, в sqlite нет такого типа данных
         if self.in_list(self.delete_list, id):
             a = (id, name, birthdate)  # добавление
             self.insert_list.append(tuple(a))
-            self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
+            if self.remove_in_list(self.update_list, id, -1)
+                self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
 
     def update(self, id, name=None, birthdate=None):
         if self.in_list(self.delete_list, id) and self.in_list(self.insert_list, id):
@@ -34,8 +36,10 @@ class PersonDbTemplates:
 
     def delete(self, id):  # удаление по uuid
         self.delete_list.append((id,))
-        self.insert_list.remove(self.remove_in_list(self.insert_list, id, 0))
-        self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
+        if remove_in_list(self.insert_list, id, 0):
+            self.insert_list.remove(self.remove_in_list(self.insert_list, id, 0))
+        if self.remove_in_list(self.update_list, id, -1):
+            self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
 
     def get_sql_statements(self):
         try:
