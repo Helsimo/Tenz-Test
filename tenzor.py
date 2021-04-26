@@ -12,12 +12,12 @@ class PersonDbTemplates:
     def add(self, id=None, name=None, birthdate=None):  # возможность добавлять id снаружи
         if id is None:
             id = str(uuid.uuid4())  # uuid храню в строке, sqlite нет такого типа данных
-        f = 0
+        flag_in_list = 0
         for elem in self.delete_list:  # проверка на нахождение в списке удаления
             if id == elem[0]:
-                f = 1
+                flag_in_list = 1
                 break
-        if not f:
+        if not flag_in_list:
             a = (id, name, birthdate)  # добавление
             self.insert_list.append(tuple(a))
             for elem in self.update_list:  # удаление из update, если он там
@@ -25,16 +25,16 @@ class PersonDbTemplates:
                     self.update_list.remove(elem)
 
     def update(self, id, name=None, birthdate=None):
-        f = 0
+        flag_in_list = 0
         for elem in self.delete_list:  # проверка на нахождение в удалении
             if id == elem[0]:
-                f = 1
+                flag_in_list = 1
                 break
         for elem in self.insert_list:  # проверка на нахождение в добавлении
             if id == elem[0]:
-                f = 1
+                flag_in_list = 1
                 break
-        if not f:
+        if not flag_in_list:
             a = [name, id, birthdate, id, id]  # добавление
             self.update_list.append(tuple(a))
 
@@ -49,21 +49,23 @@ class PersonDbTemplates:
 
     def get_sql_statements(self):
         try:
-            con = sqlite3.connect("Test_db.db")
-            cur = con.cursor()
+            connect = sqlite3.connect("Test_db.db")
+            cur = connect.cursor()
+
             if len(self.insert_list) != 0:  # add   returning
-                cur.executemany("""INSERT INTO person VALUES (?, ?, ?) ON CONFLICT DO NOTHING""",
-                                [el for el in self.insert_list]).fetchall()
-                if len(self.delete_list) != 0:
-                    cur.executemany("""DELETE FROM Person WHERE person = ?""", self.delete_list).fetchall()
-                    if len(self.update_list) != 0:  # upd  returning?
-                        que = """UPDATE person SET (Name, BirthDate) = 
+                cursor.executemany("""INSERT INTO person VALUES (?, ?, ?) ON CONFLICT DO NOTHING""",
+                                   [el for el in self.insert_list]).fetchall()
+            if len(self.delete_list) != 0:
+                cursor.executemany("""DELETE FROM Person WHERE person = ?""", self.delete_list).fetchall()
+            if len(self.update_list) != 0:  # upd  returning?
+                que = """UPDATE person SET (Name, BirthDate) = 
                     (SELECT coalesce(?, (SELECT Name FROM Test_db WHERE Person = ?), Null),
                             (SELECT coalesce(?, (SELECT BirthDate FROM Test_db WHERE Person = ?), Null)))"""
-                        que += """WHERE person = ?"""
-                        cur.executemany(que, self.update_list)
-            con.commit()
-            con.close()
+                que += """WHERE person = ?"""
+                cursor.executemany(que, self.update_list)
+
+            connect.commit()
+            connect.close()
         except Exception as e:
             print('Произошла ошибка: ', e)
 
