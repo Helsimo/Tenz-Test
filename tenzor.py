@@ -9,7 +9,7 @@ class PersonDbTemplates:
         self.delete_list = []
         self.update_list = []
 
-    def in_list(self, check_list, id):  # проверка на нахождение в списке для добавления эл-та
+    def __is_in_list__(self, check_list, id):  # проверка на нахождение в списке для добавления элемента
         """
         Принимает список из кортежей/списков(list) и id(str).
 
@@ -22,9 +22,9 @@ class PersonDbTemplates:
                 return False
         return True
 
-    def remove_in_list(self, check_list, id, pozition):  # нахождение элемента, для удаления
+    def __remove_in_list__(self, check_list, id, pozition):  # нахождение элемента, для удаления
         """
-        Список из кортежей/списков(list), id(str), индекс в кортеже/списке(int)
+        Принимает список из кортежей/списков(list), id(str), индекс в кортеже/списке(int)
 
         Возвращает кортеж, включающий в себя id на заданном индексе или False
         """
@@ -32,6 +32,24 @@ class PersonDbTemplates:
             if id == elem[pozition]:
                 return elem
         return False
+
+    def delete_person_list(self, cursor):
+        """Запрос на удаление"""
+        if len(self.delete_list) != 0:
+            cursor.executemany("""DELETE FROM Person WHERE person = ?""", self.delete_list).fetchall()
+
+    def add_person_list(self, cursor):
+        """Запрос на добавление"""
+        if len(self.insert_list) != 0:
+            cursor.executemany("""INSERT INTO person VALUES (?, ?, ?) ON CONFLICT DO NOTHING""",
+                               [el for el in self.insert_list]).fetchall()
+
+    def update_person_list(self, cursor):
+        """Запрос на обновление"""
+        if len(self.update_list) != 0:
+            query = """UPDATE person SET Name = coalesce(?, Name, Null), BirthDate = coalesce(?, BirthDate, Null)
+                        WHERE person = ?"""
+            cursor.executemany(query, self.update_list)
 
     def add(self, id=None, name=None, birthdate=None):  # возможность добавлять id снаружи
         """
@@ -44,11 +62,10 @@ class PersonDbTemplates:
         """
         if id is None:
             id = str(uuid.uuid4())  # uuid храню в строке, в sqlite нет такого типа данных
-        if self.in_list(self.delete_list, id):
-            a = (id, name, birthdate)  # добавление
-            self.insert_list.append(tuple(a))
-            if self.remove_in_list(self.update_list, id, -1):  # удаление из update, если там есть такой id
-                self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
+        if self.__is_in_list__(self.delete_list, id):  # добавление
+            self.insert_list.append(tuple([id, name, birthdate]))
+            if self.__remove_in_list__(self.update_list, id, -1):  # удаление из update, если там есть такой id
+                self.update_list.remove(self.__remove_in_list__(self.update_list, id, -1))
 
     def update(self, id, name=None, birthdate=None):
         """
@@ -59,16 +76,16 @@ class PersonDbTemplates:
             name(str): None по умолчанию
             birthdate(date): None по умолчанию
         """
-        if self.in_list(self.delete_list, id) and self.in_list(self.insert_list, id):
-            self.update_list.append(tuple([name, id, birthdate, id, id]))
+        if self.__is_in_list__(self.delete_list, id) and self.__is_in_list__(self.insert_list, id):
+            self.update_list.append(tuple([name, birthdate, id]))
 
     def delete(self, id):  # удаление по uuid
         """Удаление строки в таблице базы данных. Принимает id(str)."""
         self.delete_list.append((id,))
-        if remove_in_list(self.insert_list, id, 0):  # удаление из add, если там есть такой id
-            self.insert_list.remove(self.remove_in_list(self.insert_list, id, 0))
-        if self.remove_in_list(self.update_list, id, -1):  # удаление из update, если там есть такой id
-            self.update_list.remove(self.remove_in_list(self.update_list, id, -1))
+        if self.__remove_in_list__(self.insert_list, id, 0):  # удаление из add, если там есть такой id
+            self.insert_list.remove(self.__remove_in_list__(self.insert_list, id, 0))
+        if self.__remove_in_list__(self.update_list, id, -1):  # удаление из update, если там есть такой id
+            self.update_list.remove(self.__remove_in_list__(self.update_list, id, -1))
 
     def get_sql_statements(self):
         """Формирует общие запросы к базе данных на основе вызовов функций add, update, delete"""
@@ -76,23 +93,14 @@ class PersonDbTemplates:
             connect = sqlite3.connect("Test_db.db")
             cursor = connect.cursor()
 
-            if len(self.insert_list) != 0:
-                cursor.executemany("""INSERT INTO person VALUES (?, ?, ?) ON CONFLICT DO NOTHING""",
-                                   [el for el in self.insert_list]).fetchall()
-            if len(self.delete_list) != 0:
-                cursor.executemany("""DELETE FROM Person WHERE person = ?""", self.delete_list).fetchall()
-            if len(self.update_list) != 0:
-                que = """UPDATE person SET (Name, BirthDate) = 
-                    (SELECT coalesce(?, (SELECT Name FROM Test_db WHERE Person = ?), Null),
-                            (SELECT coalesce(?, (SELECT BirthDate FROM Test_db WHERE Person = ?), Null)))"""
-                que += """WHERE person = ?"""
-                cursor.executemany(que, self.update_list)
+            self.add_person_list(cursor)
+            self.delete_person_list(cursor)
+            self.update_person_list(cursor)
 
             connect.commit()
             connect.close()
         except Exception as e:
             print('Произошла ошибка: ', e)
-
         self.insert_list.clear()  # очистка
         self.delete_list.clear()
         self.update_list.clear()
